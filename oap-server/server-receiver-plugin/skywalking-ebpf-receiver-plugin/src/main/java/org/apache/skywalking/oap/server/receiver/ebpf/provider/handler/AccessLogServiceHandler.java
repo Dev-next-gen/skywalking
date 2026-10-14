@@ -635,17 +635,17 @@ public class AccessLogServiceHandler extends EBPFAccessLogServiceGrpc.EBPFAccess
             log.debug("detected the ztunnel outbound connection, so update the remote IP address as: {}, detect by: {}", host,
                 ztunnel.getBy());
         }
-        final ObjectID service = K8sInfoRegistry.getInstance().findServiceByIP(host);
+        final ObjectID service = K8sInfoRegistry.getInstance().findServiceByIPWithoutWait(host);
         if (service != ObjectID.EMPTY) {
             return buildRemoteAddress(nodeInfo, service, null);
         }
-        final ObjectID pod = K8sInfoRegistry.getInstance().findPodByIP(host);
+        final ObjectID pod = K8sInfoRegistry.getInstance().findPodByIPWithoutWait(host);
         if (pod == ObjectID.EMPTY) {
             // if cannot found the address, then return the unknown address
             log.debug("building unknown address by ip: {}:{}", host, ipAddress.getPort());
             return buildUnknownAddress();
         }
-        final ObjectID serviceName = K8sInfoRegistry.getInstance().findService(pod.namespace(), pod.name());
+        final ObjectID serviceName = K8sInfoRegistry.getInstance().findServiceWithoutWait(pod.namespace(), pod.name());
         if (serviceName == ObjectID.EMPTY) {
             // if the pod have been found, but the service name cannot found, then still return unknown address
             log.debug("building unknown address by pod: {}:{}", pod.name(), ipAddress.getPort());

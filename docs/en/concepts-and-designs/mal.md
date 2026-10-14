@@ -77,6 +77,10 @@ This feature requires authorizing the OAP Server to access K8s's `API Server`.
 
 Add a tag to the sample using `service` as the key, `$serviceName.$namespace` as the value, and according to the given value of the tag key, which represents the name of a pod.
 
+The pods and services are read from the Kubernetes API server in the background and cached. A pod not read yet is waited
+for up to `core.default.malMetadataReadTimeout` (`SW_CORE_MAL_METADATA_READ_TIMEOUT`, 5000 milliseconds by default);
+when the read takes longer, the sample gets an empty service, and the samples after the read get the service.
+
 For example:
 ```
 container_cpu_usage_seconds_total{namespace=default, container=my-nginx, cpu=total, pod=my-nginx-5dc4865748-mbczh} 2

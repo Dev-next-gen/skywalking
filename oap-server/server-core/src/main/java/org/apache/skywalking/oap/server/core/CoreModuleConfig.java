@@ -253,6 +253,21 @@ public class CoreModuleConfig extends ModuleConfig {
     @Getter
     private long maxDirectMemoryUsage = -1;
 
+    /**
+     * How long, in milliseconds, a MAL lookup of Kubernetes metadata, such as {@code retagByK8sMeta}, waits for
+     * metadata not read from the API server yet. The metadata keeps being read in the background after the timeout.
+     */
+    @Getter
+    private long malMetadataReadTimeout = 5000;
+
+    /**
+     * The most Kubernetes metadata reads waiting at once, per lane, as {@code als=<size>,mal=<size>}: {@code als} for
+     * Envoy ALS, the eBPF access log and every read again, {@code mal} for the MAL lookups, which wait. A lane left out,
+     * or set to -1, has no limit. The waiting reads are of distinct keys, such as the IPs seen by the lookups.
+     */
+    @Getter
+    private String k8sMetadataReadQueueSize = "";
+
     public CoreModuleConfig() {
         this.downsampling = new ArrayList<>();
     }

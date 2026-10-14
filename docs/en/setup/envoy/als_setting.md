@@ -84,7 +84,28 @@ result, it stops the loop.
 
 ### `k8s-mesh`
 
-`k8s-mesh` uses the metadata from Kubernetes clusters, hence in this analyzer, OAP needs access roles to `Pod`, `Service`, and `Endpoints`.
+`k8s-mesh` uses the metadata from Kubernetes clusters, hence in this analyzer, OAP needs access roles to `Pod`, `Service`, `Endpoints` and `Node`,
+and to Istio `ServiceEntry` when Istio is installed.
+
+The metadata is read from the Kubernetes API server in the background, one read at a time per lane, so analyzing an
+access log never waits for it. New first reads that MAL waits for use their own lane; a lookup shares any read already
+pending for its key, including one in the access logs' lane. An IP seen for the first time is analyzed as unknown while
+its pod and service are read, and the access logs after the read are analyzed with them; an IP that matches nothing is
+not read again until it is used three minutes later. A result is read again when it is used three minutes after its last
+successful read, and dropped six minutes after its last successful read, so a result that is not used, or whose read
+again finds nothing, is dropped. The lists of all endpoints, services, nodes and ServiceEntries the reads match against
+are read again once three minutes old; a failed list read is not kept, so the next read needing the list tries again. An
+IP has one pending read at most, so the reads waiting at once are of distinct IPs, and
+`core.default.k8sMetadataReadQueueSize` (`SW_CORE_K8S_METADATA_READ_QUEUE_SIZE`, no limit by default) can limit them per
+lane, as `als=<size>,mal=<size>`; an IP whose read finds the queue full is read on a later access log, and the refused
+reads are summarized at WARN. Lookup reads are sent without the Kubernetes client's retries, so a failing read holds the
+reads queued behind it for a single attempt, up to the client's request timeout, instead of through the client's retries
+and backoff; when it is read again follows the rules above. The HTTP and TCP access log analyzers share these lookups.
+
+A read the API server refuses, such as for a missing permission, is logged as one ERROR line naming the failing reads a
+minute after the first failure, then every five minutes while it lasts, and counts as finding nothing; a resource the API
+server does not serve, such as ServiceEntries without Istio, counts as finding nothing and is not logged. ServiceEntry
+hostnames that fail to resolve are summarized the same way at WARN.
 
 The [blog](https://skywalking.apache.org/blog/2020-12-03-obs-service-mesh-with-sw-and-als/) illustrates the details of how it works and a step-by-step tutorial to apply it to the `bookinfo` application.
 

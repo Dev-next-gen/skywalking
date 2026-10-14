@@ -19,44 +19,33 @@
 
 package org.apache.skywalking.library.kubernetes;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import io.fabric8.kubernetes.api.model.Endpoints;
-import lombok.SneakyThrows;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Reads the endpoints of the cluster on the calling thread, which is the background reader of a {@link LookupCache},
+ * at most once every three minutes.
+ */
 public enum KubernetesEndpoints {
     INSTANCE;
 
-    private final LoadingCache<KubernetesEndpoints, List<Endpoints>> endpoints;
+    private final CachedRead<List<Endpoints>> endpoints = new CachedRead<>(
+        Duration.ofMinutes(3),
+        () -> KubernetesApiReads.read(
+            "list endpoints",
+            () -> KubernetesApiReads.client()
+                                    .endpoints()
+                                    .inAnyNamespace()
+                                    .list()
+                                    .getItems()
+        ),
+        Collections.emptyList()
+    );
 
-    @SneakyThrows
-    KubernetesEndpoints() {
-        final CacheBuilder<Object, Object> cacheBuilder =
-            CacheBuilder.newBuilder()
-                        .expireAfterWrite(Duration.ofMinutes(3));
-
-        endpoints = cacheBuilder.build(CacheLoader.from(() -> {
-            try {
-                return SharedKubernetesClient.INSTANCE.get()
-                        .endpoints()
-                        .inAnyNamespace()
-                        .list()
-                        .getItems();
-            } catch (Exception e) {
-                LoggerFactory.getLogger(getClass()).error("Failed to list Endpoints.", e);
-                return Collections.emptyList();
-            }
-        }));
-    }
-
-    @SneakyThrows
     public List<Endpoints> list() {
-        return endpoints.get(this);
+        return endpoints.get();
     }
 }

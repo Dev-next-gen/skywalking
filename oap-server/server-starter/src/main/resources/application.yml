@@ -149,6 +149,11 @@ core:
     maxHeapMemoryUsagePercent: ${SW_CORE_MAX_HEAP_MEMORY_USAGE_PERCENT:96}
     # The long value of the max direct memory usage. The default max value is -1, representing no limit. The unit is in bytes.
     maxDirectMemoryUsage: ${SW_CORE_MAX_DIRECT_MEMORY_USAGE:-1}
+    # How long, in milliseconds, a MAL lookup of Kubernetes metadata, such as retagByK8sMeta, waits for metadata not read from the API server yet.
+    malMetadataReadTimeout: ${SW_CORE_MAL_METADATA_READ_TIMEOUT:5000}
+    # The most Kubernetes metadata reads waiting at once per lane, as als=<size>,mal=<size>: als for Envoy ALS, the eBPF access log and every read again,
+    # mal for the MAL lookups, which wait. A lane left out, or -1, has no limit. The waiting reads are of distinct keys, such as IPs.
+    k8sMetadataReadQueueSize: ${SW_CORE_K8S_METADATA_READ_QUEUE_SIZE:""}
 storage:
   selector: ${SW_STORAGE:banyandb}
   banyandb:

@@ -19,63 +19,45 @@
 
 package org.apache.skywalking.library.kubernetes;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import io.fabric8.kubernetes.api.model.Service;
-import lombok.SneakyThrows;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Reads services from the API server on the calling thread, which is the background reader of a
+ * {@link LookupCache}; the list of all services at most once every three minutes.
+ */
 public enum KubernetesServices {
     INSTANCE;
 
-    private final LoadingCache<KubernetesServices, List<Service>> services;
-    private final LoadingCache<ObjectID, Optional<Service>> serviceByID;
+    private final CachedRead<List<Service>> services = new CachedRead<>(
+        Duration.ofMinutes(3),
+        () -> KubernetesApiReads.read(
+            "list services",
+            () -> KubernetesApiReads.client()
+                                    .services()
+                                    .inAnyNamespace()
+                                    .list()
+                                    .getItems()
+        ),
+        Collections.emptyList()
+    );
 
-    @SneakyThrows
-    KubernetesServices() {
-        final CacheBuilder<Object, Object> cacheBuilder =
-            CacheBuilder.newBuilder()
-                        .expireAfterWrite(Duration.ofMinutes(3));
-
-        services = cacheBuilder.build(CacheLoader.from(() -> {
-            try {
-                return SharedKubernetesClient.INSTANCE.get()
-                        .services()
-                        .inAnyNamespace()
-                        .list()
-                        .getItems();
-            } catch (Exception e) {
-                LoggerFactory.getLogger(getClass()).error("Failed to list Services.", e);
-                return Collections.emptyList();
-            }
-        }));
-
-        serviceByID = cacheBuilder.build(new CacheLoader<>() {
-            @Override
-            public Optional<Service> load(ObjectID id) {
-                return Optional.ofNullable(
-                    SharedKubernetesClient.INSTANCE.get()
-                        .services()
-                        .inNamespace(id.namespace())
-                        .withName(id.name())
-                        .get());
-            }
-        });
-    }
-
-    @SneakyThrows
     public List<Service> list() {
-        return services.get(this);
+        return services.get();
     }
 
-    @SneakyThrows
     public Optional<Service> findByID(final ObjectID id) {
-        return serviceByID.get(id);
+        return Optional.ofNullable(KubernetesApiReads.read(
+            "get services",
+            () -> KubernetesApiReads.client()
+                                    .services()
+                                    .inNamespace(id.namespace())
+                                    .withName(id.name())
+                                    .get()
+        ));
     }
 }
